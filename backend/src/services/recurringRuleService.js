@@ -1,6 +1,12 @@
 import { randomUUID } from 'node:crypto'
 import { calculateNextOccurrence } from '../domain/calculateNextOccurrence.js'
-import { store } from '../data/store.js'
+import {
+    findRecurringRules,
+    insertRecurringRule,
+    insertTransaction,
+    occurrenceExists,
+    updateRuleNextDate,
+} from '../data/repository.js'
 import { ValidationError } from './transactionService.js'
 
 const SUPPORTED_FREQUENCIES = ['weekly', 'monthly', 'yearly']
@@ -99,15 +105,12 @@ function validateRule(input) {
     }
 }
 
-export function listRecurringRules(clientId) {
+export async function listRecurringRules(clientId) {
     const normalizedClientId = normalizeClientId(clientId)
-
-    return store.recurringRules.filter(
-        (rule) => rule.clientId === normalizedClientId,
-    )
+    return findRecurringRules(normalizedClientId)
 }
 
-export function createRecurringRule(clientId, input) {
+export async function createRecurringRule(clientId, input) {
     const ruleData = validateRule(input)
     const rule = {
         id: randomUUID(),
@@ -116,17 +119,14 @@ export function createRecurringRule(clientId, input) {
         nextOccurrenceDate: ruleData.startDate,
     }
 
-    store.recurringRules.push(rule)
-
-    return rule
+    return insertRecurringRule(rule)
 }
 
-function hasGeneratedOccurrence(rule, occurrenceDate) {
-    return store.transactions.some(
-        (transaction) =>
-            transaction.clientId === rule.clientId &&
-            transaction.recurringRuleId === rule.id &&
-            transaction.occurrenceDate === occurrenceDate,
+async function hasGeneratedOccurrence(rule, occurrenceDate) {
+    return occurrenceExists(
+        rule.clientId,
+        rule.id,
+        occurrenceDate,
     )
 }
 
@@ -144,7 +144,7 @@ function buildTransaction(rule, occurrenceDate) {
     }
 }
 
-export function generateDueTransactions(clientId, throughDateValue) {
+export async function generateDueTransactions(clientId, throughDateValue) {
     const normalizedClientId = normalizeClientId(clientId)
     const throughDate = parseDateOnly(
         throughDateValue,
@@ -153,8 +153,10 @@ export function generateDueTransactions(clientId, throughDateValue) {
     const generatedTransactions = []
     let skippedDuplicates = 0
 
-    for (const rule of store.recurringRules) {
-        if (rule.clientId !== normalizedClientId || !rule.active) {
+    const rules = await findRecurringRules(normalizedClientId)
+
+    for (const rule of rules) {
+        if (!rule.active) {
             continue
         }
 
@@ -173,7 +175,12 @@ export function generateDueTransactions(clientId, throughDateValue) {
         ) {
             const occurrenceDateValue = formatDateOnly(occurrenceDate)
 
-            if (hasGeneratedOccurrence(rule, occurrenceDateValue)) {
+            const duplicate = await hasGeneratedOccurrence(
+                rule,
+                occurrenceDateValue,
+            )
+
+            if (duplicate) {
                 skippedDuplicates += 1
             } else {
                 const transaction = buildTransaction(
@@ -181,8 +188,10 @@ export function generateDueTransactions(clientId, throughDateValue) {
                     occurrenceDateValue,
                 )
 
-                store.transactions.push(transaction)
-                generatedTransactions.push(transaction)
+                const savedTransaction = await insertTransaction(
+                    transaction,
+                )
+                generatedTransactions.push(savedTransaction)
             }
 
             occurrenceDate = calculateNextOccurrence(
@@ -193,6 +202,10 @@ export function generateDueTransactions(clientId, throughDateValue) {
         }
 
         rule.nextOccurrenceDate = formatDateOnly(occurrenceDate)
+        await updateRuleNextDate(
+            rule.id,
+            rule.nextOccurrenceDate,
+        )
     }
 
     return {

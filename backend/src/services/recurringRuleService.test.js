@@ -25,10 +25,10 @@ describe('recurringRuleService', function () {
         resetStore()
     })
 
-    test('sukuria taisyklę ir sugeneruoja atėjusias operacijas', function () {
-        const rule = createRecurringRule(CLIENT_A_ID, MONTHLY_RULE)
+    test('sukuria taisyklę ir sugeneruoja atėjusias operacijas', async function () {
+        const rule = await createRecurringRule(CLIENT_A_ID, MONTHLY_RULE)
 
-        const result = generateDueTransactions(
+        const result = await generateDueTransactions(
             CLIENT_A_ID,
             '2027-03-31',
         )
@@ -47,13 +47,13 @@ describe('recurringRuleService', function () {
         expect(rule.nextOccurrenceDate).toBe('2027-04-30')
     })
 
-    test('pakartotinai negeneruoja tos pačios taisyklės ir datos', function () {
-        const rule = createRecurringRule(CLIENT_A_ID, MONTHLY_RULE)
+    test('pakartotinai negeneruoja tos pačios taisyklės ir datos', async function () {
+        const rule = await createRecurringRule(CLIENT_A_ID, MONTHLY_RULE)
 
-        generateDueTransactions(CLIENT_A_ID, '2027-01-31')
+        await generateDueTransactions(CLIENT_A_ID, '2027-01-31')
         rule.nextOccurrenceDate = '2027-01-31'
 
-        const result = generateDueTransactions(
+        const result = await generateDueTransactions(
             CLIENT_A_ID,
             '2027-01-31',
         )
@@ -70,26 +70,28 @@ describe('recurringRuleService', function () {
         expect(ruleTransactions.length).toBe(1)
     })
 
-    test('atmeta netinkamą taisyklę', function () {
+    test('atmeta netinkamą taisyklę', async function () {
         const invalidRule = {
             ...MONTHLY_RULE,
             amountCents: 0,
         }
 
-        expect(function () {
-            createRecurringRule(CLIENT_A_ID, invalidRule)
-        }).toThrow('Suma turi būti teigiamas sveikas centų skaičius')
+        await expect(
+            createRecurringRule(CLIENT_A_ID, invalidRule),
+        ).rejects.toThrow(
+            'Suma turi būti teigiamas sveikas centų skaičius',
+        )
     })
 
-    test('nekuria operacijų po taisyklės pabaigos datos', function () {
+    test('nekuria operacijų po taisyklės pabaigos datos', async function () {
         const ruleWithEndDate = {
             ...MONTHLY_RULE,
             endDate: '2027-02-28',
         }
 
-        createRecurringRule(CLIENT_A_ID, ruleWithEndDate)
+        await createRecurringRule(CLIENT_A_ID, ruleWithEndDate)
 
-        const result = generateDueTransactions(
+        const result = await generateDueTransactions(
             CLIENT_A_ID,
             '2027-03-31',
         )
@@ -97,23 +99,23 @@ describe('recurringRuleService', function () {
         expect(result.generatedTransactions.length).toBe(2)
     })
 
-    test('izoliuoja skirtingų klientų taisykles ir generavimą', function () {
-        createRecurringRule(CLIENT_A_ID, MONTHLY_RULE)
+    test('izoliuoja skirtingų klientų taisykles ir generavimą', async function () {
+        await createRecurringRule(CLIENT_A_ID, MONTHLY_RULE)
 
         const clientBRule = {
             ...MONTHLY_RULE,
             category: 'Transportas',
         }
 
-        createRecurringRule(CLIENT_B_ID, clientBRule)
+        await createRecurringRule(CLIENT_B_ID, clientBRule)
 
-        const result = generateDueTransactions(
+        const result = await generateDueTransactions(
             CLIENT_A_ID,
             '2027-01-31',
         )
 
-        const clientARules = listRecurringRules(CLIENT_A_ID)
-        const clientBRules = listRecurringRules(CLIENT_B_ID)
+        const clientARules = await listRecurringRules(CLIENT_A_ID)
+        const clientBRules = await listRecurringRules(CLIENT_B_ID)
 
         expect(result.generatedTransactions.length).toBe(1)
         expect(result.generatedTransactions[0].clientId).toBe(CLIENT_A_ID)

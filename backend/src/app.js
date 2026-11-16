@@ -2,7 +2,7 @@ import cors from 'cors'
 import express from 'express'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { store } from './data/store.js'
+import { getClients } from './data/repository.js'
 import { recurringRuleRouter } from './routes/recurringRuleRoutes.js'
 import { transactionRouter } from './routes/transactionRoutes.js'
 
@@ -22,9 +22,9 @@ app.get('/api/health', (request, response) => {
     })
 })
 
-app.get('/api/clients', (request, response) => {
+app.get('/api/clients', async function getClientList(request, response) {
     response.json({
-        clients: store.clients,
+        clients: await getClients(),
     })
 })
 

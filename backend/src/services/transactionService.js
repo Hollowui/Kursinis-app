@@ -1,5 +1,10 @@
 import { randomUUID } from 'node:crypto'
-import { store } from '../data/store.js'
+import {
+    deleteTransactionRecord,
+    findTransactions,
+    insertTransaction,
+    updateTransactionRecord,
+} from '../data/repository.js'
 
 export class ValidationError extends Error {}
 
@@ -48,75 +53,51 @@ function validateTransaction(input) {
     }
 }
 
-export function listTransactions(clientId) {
+export async function listTransactions(clientId) {
     const normalizedClientId = normalizeClientId(clientId)
-
-    return store.transactions.filter(
-        (transaction) =>
-            transaction.clientId === normalizedClientId,
-    )
+    return findTransactions(normalizedClientId)
 }
 
-export function createTransaction(clientId, input) {
+export async function createTransaction(clientId, input) {
     const transaction = {
         id: randomUUID(),
         clientId: normalizeClientId(clientId),
         ...validateTransaction(input),
     }
 
-    store.transactions.push(transaction)
-
-    return transaction
+    return insertTransaction(transaction)
 }
 
-export function updateTransaction(
+export async function updateTransaction(
     clientId,
     transactionId,
     input,
 ) {
     const normalizedClientId = normalizeClientId(clientId)
-
-    const transactionIndex = store.transactions.findIndex(
-        (transaction) =>
-            transaction.id === transactionId &&
-            transaction.clientId === normalizedClientId,
+    const transactions = await findTransactions(normalizedClientId)
+    const currentTransaction = transactions.find(
+        function findTransaction(transaction) {
+            return transaction.id === transactionId
+        },
     )
 
-    if (transactionIndex === -1) {
+    if (!currentTransaction) {
         return null
     }
 
-    const currentTransaction =
-        store.transactions[transactionIndex]
-
-    const updatedTransaction = {
-        ...currentTransaction,
-        ...validateTransaction({
+    const validatedTransaction = validateTransaction({
             ...currentTransaction,
             ...input,
-        }),
-    }
+    })
 
-    store.transactions[transactionIndex] =
-        updatedTransaction
-
-    return updatedTransaction
+    return updateTransactionRecord(
+        normalizedClientId,
+        transactionId,
+        validatedTransaction,
+    )
 }
 
-export function deleteTransaction(clientId, transactionId) {
+export async function deleteTransaction(clientId, transactionId) {
     const normalizedClientId = normalizeClientId(clientId)
-
-    const transactionIndex = store.transactions.findIndex(
-        (transaction) =>
-            transaction.id === transactionId &&
-            transaction.clientId === normalizedClientId,
-    )
-
-    if (transactionIndex === -1) {
-        return false
-    }
-
-    store.transactions.splice(transactionIndex, 1)
-
-    return true
+    return deleteTransactionRecord(normalizedClientId, transactionId)
 }

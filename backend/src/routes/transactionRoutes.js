@@ -12,17 +12,17 @@ export const transactionRouter = express.Router()
 
 transactionRouter.use(requireClientContext)
 
-transactionRouter.get('/', (request, response) => {
-    const transactions = listTransactions(
+transactionRouter.get('/', async function getTransactions(request, response) {
+    const transactions = await listTransactions(
         request.clientId,
     )
 
     response.json({ transactions })
 })
 
-transactionRouter.post('/', (request, response) => {
+transactionRouter.post('/', async function postTransaction(request, response) {
     try {
-        const transaction = createTransaction(
+        const transaction = await createTransaction(
             request.clientId,
             request.body,
         )
@@ -41,9 +41,9 @@ transactionRouter.post('/', (request, response) => {
 
 transactionRouter.patch(
     '/:transactionId',
-    (request, response) => {
+    async function patchTransaction(request, response) {
         try {
-            const transaction = updateTransaction(
+            const transaction = await updateTransaction(
                 request.clientId,
                 request.params.transactionId,
                 request.body,
@@ -69,8 +69,8 @@ transactionRouter.patch(
 )
 transactionRouter.delete(
     '/:transactionId',
-    (request, response) => {
-        const deleted = deleteTransaction(
+    async function removeTransaction(request, response) {
+        const deleted = await deleteTransaction(
             request.clientId,
             request.params.transactionId,
         )

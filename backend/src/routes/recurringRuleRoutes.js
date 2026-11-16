@@ -11,15 +11,15 @@ export const recurringRuleRouter = express.Router()
 
 recurringRuleRouter.use(requireClientContext)
 
-recurringRuleRouter.get('/', (request, response) => {
+recurringRuleRouter.get('/', async function getRules(request, response) {
     response.json({
-        recurringRules: listRecurringRules(request.clientId),
+        recurringRules: await listRecurringRules(request.clientId),
     })
 })
 
-recurringRuleRouter.post('/', (request, response) => {
+recurringRuleRouter.post('/', async function postRule(request, response) {
     try {
-        const recurringRule = createRecurringRule(
+        const recurringRule = await createRecurringRule(
             request.clientId,
             request.body,
         )
@@ -34,9 +34,9 @@ recurringRuleRouter.post('/', (request, response) => {
     }
 })
 
-recurringRuleRouter.post('/generate', (request, response) => {
+recurringRuleRouter.post('/generate', async function generateRules(request, response) {
     try {
-        const result = generateDueTransactions(
+        const result = await generateDueTransactions(
             request.clientId,
             request.body.throughDate,
         )

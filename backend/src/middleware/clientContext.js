@@ -1,8 +1,8 @@
-import { store } from '../data/store.js'
+import { clientExists } from '../data/repository.js'
 
 const OBJECT_ID_PATTERN = /^[a-f\d]{24}$/i
 
-export function requireClientContext(
+export async function requireClientContext(
     request,
     response,
     next,
@@ -21,11 +21,9 @@ export function requireClientContext(
         })
     }
 
-    const clientExists = store.clients.some(
-        (client) => client.id === clientId,
-    )
+    const exists = await clientExists(clientId)
 
-    if (!clientExists) {
+    if (!exists) {
         return response.status(404).json({
             error: 'Klientas nerastas',
         })
