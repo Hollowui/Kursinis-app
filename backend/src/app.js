@@ -1,6 +1,7 @@
 import cors from 'cors'
 import express from 'express'
 import { store } from './data/store.js'
+import { recurringRuleRouter } from './routes/recurringRuleRoutes.js'
 import { transactionRouter } from './routes/transactionRoutes.js'
 
 export const app = express()
@@ -22,6 +23,7 @@ app.get('/api/clients', (request, response) => {
 })
 
 app.use('/api/transactions', transactionRouter)
+app.use('/api/recurring-rules', recurringRuleRouter)
 
 app.use((error, request, response, next) => {
     console.error(error)

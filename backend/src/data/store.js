@@ -36,8 +36,10 @@ export const store = {
         },
     ],
     transactions: createInitialTransactions(),
+    recurringRules: [],
 }
 
 export function resetStore() {
     store.transactions = createInitialTransactions()
+    store.recurringRules = []
 }

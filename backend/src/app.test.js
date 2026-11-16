@@ -75,4 +75,41 @@ describe('klientų duomenų izoliacija', () => {
             CLIENT_A_ID,
         )
     })
+
+    it('įvykdo periodinės operacijos scenarijų per API', async () => {
+        const createResponse = await request(app)
+            .post('/api/recurring-rules')
+            .set('x-client-id', CLIENT_A_ID)
+            .send({
+                type: 'expense',
+                amountCents: 1999,
+                category: 'Prenumeratos',
+                description: 'Muzika',
+                frequency: 'monthly',
+                startDate: '2026-10-31',
+            })
+            .expect(201)
+
+        await request(app)
+            .post('/api/recurring-rules/generate')
+            .set('x-client-id', CLIENT_A_ID)
+            .send({ throughDate: '2026-11-30' })
+            .expect(200)
+
+        const transactionsResponse = await request(app)
+            .get('/api/transactions')
+            .set('x-client-id', CLIENT_A_ID)
+            .expect(200)
+
+        expect(createResponse.body.recurringRule.nextOccurrenceDate)
+            .toBe('2026-10-31')
+        expect(
+            transactionsResponse.body.transactions
+                .filter((transaction) =>
+                    transaction.recurringRuleId ===
+                    createResponse.body.recurringRule.id,
+                )
+                .map((transaction) => transaction.occurrenceDate),
+        ).toEqual(['2026-10-31', '2026-11-30'])
+    })
 })
