@@ -1,10 +1,16 @@
 import cors from 'cors'
 import express from 'express'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { store } from './data/store.js'
 import { recurringRuleRouter } from './routes/recurringRuleRoutes.js'
 import { transactionRouter } from './routes/transactionRoutes.js'
 
 export const app = express()
+const frontendDirectory = resolve(
+    dirname(fileURLToPath(import.meta.url)),
+    '../../frontend/dist',
+)
 
 app.use(cors())
 app.use(express.json())
@@ -24,6 +30,24 @@ app.get('/api/clients', (request, response) => {
 
 app.use('/api/transactions', transactionRouter)
 app.use('/api/recurring-rules', recurringRuleRouter)
+
+app.use(express.static(frontendDirectory))
+
+app.use((request, response, next) => {
+    if (
+        request.method !== 'GET' ||
+        request.path.startsWith('/api/')
+    ) {
+        return next()
+    }
+
+    response.sendFile(
+        resolve(frontendDirectory, 'index.html'),
+        (error) => {
+            if (error) next(error)
+        },
+    )
+})
 
 app.use((error, request, response, next) => {
     console.error(error)
