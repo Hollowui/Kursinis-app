@@ -2,7 +2,7 @@
 
 Tai II užduoties veikiantis prototipas. Įgyvendintas pagrindinis scenarijus: klientas sukuria pasikartojančios pajamų arba išlaidų operacijos taisyklę, o sistema iki pasirinktos datos sugeneruoja faktines operacijas, apskaičiuoja kitą vykdymo datą ir nekuria dublikatų.
 
-Duomenys prototipe laikomi atmintyje ir grąžinami į pradinę būseną perkrovus backend. Prisijungimas, rolės, MongoDB ir diegimas nėra II užduoties dalis.
+Jeigu nustatytas `MONGODB_URI`, klientai, operacijos ir periodinės taisyklės saugomos MongoDB. Be šio nustatymo programa automatiškai naudoja atminties saugyklą, todėl ją galima greitai paleisti demonstracijai ar testams.
 
 ## Reikalingi įrankiai
 
@@ -10,21 +10,57 @@ Duomenys prototipe laikomi atmintyje ir grąžinami į pradinę būseną perkrov
 - npm 10 arba naujesnė versija (patikrinta su npm 11.6.2).
 - Moderni naršyklė.
 
-API raktų, `.env` failo ar kitų konfigūracijos parametrų nereikia. Express API ir sukompiliuotas frontend pateikiami adresu `http://localhost:3000`.
+Express API ir sukompiliuotas frontend pateikiami adresu `http://localhost:3000`.
+
+Norėdami naudoti MongoDB, nukopijuokite `.env.example` į `.env` ir nustatykite ryšio adresą:
+
+```env
+MONGODB_URI=mongodb://127.0.0.1:27017/budget_tracker
+```
+
+## Duomenų saugojimas
+
+Programa palaiko du duomenų saugojimo režimus. Frontend ir verslo logika abiem atvejais naudoja tuos pačius API endpoint'us. Saugyklą pasirenka backend `repository` sluoksnis.
+
+```text
+Frontend
+   ↓
+API maršrutas
+   ↓
+Servisas
+   ↓
+Repository
+   ├── MongoDB
+   └── Atminties saugykla
+```
+
+### MongoDB režimas
+
+Jeigu projekto šakniniame `.env` faile nustatytas `MONGODB_URI` ir ryšys sėkmingai užmezgamas, klientai, operacijos ir periodinės taisyklės saugomos MongoDB. Šiame režime duomenys išlieka po Node.js serverio perkrovimo.
+
+Pirmą kartą prisijungus prie tuščios duomenų bazės automatiškai sukuriami du pavyzdiniai klientai ir jų pradinės operacijos.
+
+### Atminties režimas
+
+Jeigu `.env` failo nėra arba jame nenustatytas `MONGODB_URI`, Mongoose ryšys nekuriamas, o `repository` funkcijos naudoja `backend/src/data/store.js` esančius masyvus.
+
+Šiam režimui nereikia MongoDB instaliacijos ar papildomos konfigūracijos. Jis tinka greitam prototipo paleidimui, demonstracijai ir automatiniams testams. Sustabdžius Node.js serverį, vartotojo sukurti duomenys dingsta, o kitą kartą paleidus atkuriami pradiniai pavyzdiniai duomenys.
+
+Jeigu `MONGODB_URI` yra nustatytas, bet adresas neteisingas arba MongoDB serveris neveikia, aplikacija parodo prisijungimo klaidą ir nepasileidžia. Tokiu atveju ji automatiškai nepersijungia į atminties režimą, kad neteisinga konfigūracija neliktų nepastebėta.
 
 ## Paruošimas ir paleidimas
 
 Pirmą kartą projekto šakniniame kataloge įdiekite backend ir frontend priklausomybes:
 
-```bash
-npm run setup
-```
+
+`npm run setup`
+
 
 Po pradinio paruošimo visą prototipą paleidžia viena komanda:
 
-```bash
-npm run dev
-```
+
+`npm run dev`
+
 
 Atidarykite naršyklėje `http://localhost:3000`. Sustabdykite serverį su `Ctrl+C`.
 
@@ -35,7 +71,7 @@ Prototipe iš anksto paruošti du klientai:
 - `Klientas A` (`000000000000000000000001`) turi 45,00 Eur maisto išlaidą.
 - `Klientas B` (`000000000000000000000002`) turi 25,00 Eur transporto išlaidą.
 
-Visos klientui priklausančios API užklausos naudoja `x-client-id` antraštę. Backend tikrina klientą ir kiekvieną taisyklių bei operacijų paiešką riboja šiuo identifikatoriumi. Frontend antraštę nustato pagal pasirinktą klientą.
+Pirmą kartą prisijungus prie tuščios MongoDB duomenų bazės, abu klientai ir jų pavyzdinės operacijos sukuriami automatiškai. Visos klientui priklausančios API užklausos naudoja `x-client-id` antraštę. Backend tikrina klientą ir kiekvieną taisyklių bei operacijų paiešką riboja šiuo identifikatoriumi. Frontend antraštę nustato pagal pasirinktą klientą.
 
 ## Demonstravimo žingsniai
 
@@ -50,15 +86,11 @@ Visos klientui priklausančios API užklausos naudoja `x-client-id` antraštę. 
 
 Backend testai:
 
-```bash
-npm test
-```
+`npm test`
 
 Visa automatinė patikra (backend testai, frontend lint ir production build):
 
-```bash
-npm run check
-```
+`npm run check`
 
 Testų rinkinys tikrina įprastą generavimą, 31 dienos perkėlimą į paskutinę trumpesnio mėnesio dieną, taisyklės pabaigos ribą, netinkamą įvestį, dublikatų prevenciją, API scenarijų ir klientų duomenų izoliavimą.
 
@@ -68,6 +100,7 @@ Testų rinkinys tikrina įprastą generavimą, 31 dienos perkėlimą į paskutin
 - `GET /api/transactions` - aktyvaus kliento operacijos.
 - `POST /api/transactions` - rankinė operacija.
 - `PATCH /api/transactions/:transactionId` - aktyvaus kliento operacijos pakeitimas.
+- `DELETE /api/transactions/:transactionId` - aktyvaus kliento operacijos ištrynimas.
 - `GET /api/recurring-rules` - aktyvaus kliento taisyklės.
 - `POST /api/recurring-rules` - nauja taisyklė.
 - `POST /api/recurring-rules/generate` - atėjusių operacijų generavimas iki `throughDate`.
