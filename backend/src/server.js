@@ -1,19 +1,25 @@
-import express from 'express'
-import cors from 'cors'
+import { app } from './app.js'
+import {
+    connectDatabase,
+    seedDatabase,
+} from './data/database.js'
 
-const app = express()
 const PORT = 3000
 
-app.use(cors())
-app.use(express.json())
+async function startServer() {
+    try {
+        await connectDatabase()
+        await seedDatabase()
 
-app.get('/api/health', (request, response) => {
-    response.json({
-        status: 'ok',
-        message: 'Budget Tracker API veikia',
-    })
-})
+        app.listen(PORT, function serverStarted() {
+            console.log(
+                'Serveris veikia adresu http://localhost:' + PORT,
+            )
+        })
+    } catch (error) {
+        console.error('Nepavyko paleisti serverio:', error.message)
+        process.exit(1)
+    }
+}
 
-app.listen(PORT, () => {
-    console.log(`Serveris veikia adresu http://localhost:${PORT}`)
-})
+startServer()

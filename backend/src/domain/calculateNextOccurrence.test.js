@@ -1,8 +1,8 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, test } from 'vitest'
 import { calculateNextOccurrence } from './calculateNextOccurrence.js'
 
-describe('calculateNextOccurrence', () => {
-    it('prideda 7 dienas savaitinei taisyklei', () => {
+describe('calculateNextOccurrence', function () {
+    test('prideda 7 dienas savaitinei taisyklei', function () {
         const startDate = new Date(2026, 9, 10)
 
         const result = calculateNextOccurrence(
@@ -14,7 +14,7 @@ describe('calculateNextOccurrence', () => {
         expect(result).toEqual(new Date(2026, 9, 17))
     })
 
-    it('mėnesinei taisyklei pritaiko paskutinę mėnesio dieną', () => {
+    test('mėnesinei taisyklei pritaiko paskutinę mėnesio dieną', function () {
         const startDate = new Date(2027, 0, 31)
 
         const result = calculateNextOccurrence(
@@ -26,7 +26,7 @@ describe('calculateNextOccurrence', () => {
         expect(result).toEqual(new Date(2027, 1, 28))
     })
 
-    it('metinei vasario 29 dienos taisyklei grįžta į keliamųjų metų datą', () => {
+    test('metinei vasario 29 dienos taisyklei grįžta į keliamųjų metų datą', function () {
         const startDate = new Date(2028, 1, 29)
 
         const date2029 = calculateNextOccurrence(
@@ -59,10 +59,10 @@ describe('calculateNextOccurrence', () => {
         expect(date2032).toEqual(new Date(2032, 1, 29))
     })
 
-    it('atmeta nepalaikomą pasikartojimo dažnį', () => {
+    test('atmeta nepalaikomą pasikartojimo dažnį', function () {
         const startDate = new Date(2026, 9, 10)
 
-        expect(() => {
+        expect(function () {
             calculateNextOccurrence(
                 startDate,
                 'daily',

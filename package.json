@@ -1,0 +1,11 @@
+{
+  "name": "budget-tracker-prototype",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "setup": "npm install --prefix backend && npm install --prefix frontend",
+    "dev": "npm run build --prefix frontend && node backend/src/server.js",
+    "test": "npm test --prefix backend",
+    "check": "npm test --prefix backend && npm run lint --prefix frontend && npm run build --prefix frontend"
+  }
+}
