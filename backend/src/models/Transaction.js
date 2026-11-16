@@ -36,6 +36,15 @@ const transactionSchema = new mongoose.Schema(
             type: Date,
             required: true,
         },
+        recurringRuleId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'RecurringRule',
+            default: null,
+        },
+        occurrenceDate: {
+            type: String,
+            default: null,
+        },
     },
     {
         timestamps: true,
@@ -46,6 +55,20 @@ transactionSchema.index({
     clientId: 1,
     date: -1,
 })
+
+transactionSchema.index(
+    {
+        clientId: 1,
+        recurringRuleId: 1,
+        occurrenceDate: 1,
+    },
+    {
+        unique: true,
+        partialFilterExpression: {
+            recurringRuleId: { $type: 'objectId' },
+        },
+    },
+)
 
 export const Transaction = mongoose.model(
     'Transaction',
