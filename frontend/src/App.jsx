@@ -24,7 +24,11 @@ function createEmptyTransactionForm() {
 async function apiRequest(path, options) {
   const requestOptions = options || {}
   const response = await fetch(path, requestOptions)
-  const data = await response.json()
+  let data = null
+
+  if (response.status !== 204) {
+    data = await response.json()
+  }
 
   if (!response.ok) {
     throw new Error(data.error || 'Užklausa nepavyko')
@@ -42,6 +46,25 @@ function formatMoney(amountCents) {
   return formatter.format(amountCents / 100)
 }
 
+function calculateSummary(transactions) {
+  let income = 0
+  let expense = 0
+
+  transactions.forEach(function addTransaction(transaction) {
+    if (transaction.type === 'income') {
+      income += transaction.amountCents
+    } else {
+      expense += transaction.amountCents
+    }
+  })
+
+  return {
+    income: income,
+    expense: expense,
+    balance: income - expense,
+  }
+}
+
 function App() {
   const [clients, setClients] = useState([])
   const [clientId, setClientId] = useState('')
@@ -54,6 +77,9 @@ function App() {
   const [throughDate, setThroughDate] = useState('2026-11-30')
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
+  const [editingTransactionId, setEditingTransactionId] = useState('')
+  const [typeFilter, setTypeFilter] = useState('all')
+  const [categoryFilter, setCategoryFilter] = useState('')
 
   useEffect(function loadClients() {
     apiRequest('/api/clients')
@@ -99,6 +125,8 @@ function App() {
     setClientId(event.target.value)
     setMessage('')
     setError('')
+    setEditingTransactionId('')
+    setTransactionForm(createEmptyTransactionForm())
   }
 
   function changeRecurringForm(event) {
@@ -127,6 +155,14 @@ function App() {
 
   function changeThroughDate(event) {
     setThroughDate(event.target.value)
+  }
+
+  function changeTypeFilter(event) {
+    setTypeFilter(event.target.value)
+  }
+
+  function changeCategoryFilter(event) {
+    setCategoryFilter(event.target.value)
   }
 
   async function reloadClientData() {
@@ -163,9 +199,17 @@ function App() {
       date: transactionForm.date,
     }
 
+    let requestPath = '/api/transactions'
+    let requestMethod = 'POST'
+
+    if (editingTransactionId) {
+      requestPath += '/' + editingTransactionId
+      requestMethod = 'PATCH'
+    }
+
     try {
-      await apiRequest('/api/transactions', {
-        method: 'POST',
+      await apiRequest(requestPath, {
+        method: requestMethod,
         headers: {
           'content-type': 'application/json',
           'x-client-id': clientId,
@@ -175,7 +219,68 @@ function App() {
 
       await reloadClientData()
       setTransactionForm(createEmptyTransactionForm())
-      setMessage('Operacija sėkmingai sukurta.')
+      setEditingTransactionId('')
+
+      if (requestMethod === 'POST') {
+        setMessage('Operacija sėkmingai sukurta.')
+      } else {
+        setMessage('Operacija sėkmingai atnaujinta.')
+      }
+    } catch (requestError) {
+      setError(requestError.message)
+    }
+  }
+
+  function startEditingTransaction(event) {
+    const transactionId = event.currentTarget.dataset.transactionId
+    const transaction = transactions.find(function findTransaction(item) {
+      return item.id === transactionId
+    })
+
+    if (!transaction) {
+      return
+    }
+
+    setEditingTransactionId(transaction.id)
+    setTransactionForm({
+      type: transaction.type,
+      amount: (transaction.amountCents / 100).toFixed(2),
+      category: transaction.category,
+      description: transaction.description || '',
+      date: transaction.date.slice(0, 10),
+    })
+    setMessage('Redaguojama pasirinkta operacija.')
+    setError('')
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  function cancelEditingTransaction() {
+    setEditingTransactionId('')
+    setTransactionForm(createEmptyTransactionForm())
+    setMessage('')
+  }
+
+  async function removeTransaction(event) {
+    const transactionId = event.currentTarget.dataset.transactionId
+    const confirmed = window.confirm(
+      'Ar tikrai norite ištrinti šią operaciją?',
+    )
+
+    if (!confirmed) {
+      return
+    }
+
+    try {
+      await apiRequest('/api/transactions/' + transactionId, {
+        method: 'DELETE',
+        headers: {
+          'x-client-id': clientId,
+        },
+      })
+
+      await reloadClientData()
+      setMessage('Operacija ištrinta.')
+      setError('')
     } catch (requestError) {
       setError(requestError.message)
     }
@@ -293,6 +398,26 @@ function App() {
         <td>{transaction.category}</td>
         <td>{description}</td>
         <td>{formatMoney(transaction.amountCents)}</td>
+        <td>
+          <div className="row-actions">
+            <button
+              className="text-button"
+              type="button"
+              data-transaction-id={transaction.id}
+              onClick={startEditingTransaction}
+            >
+              Redaguoti
+            </button>
+            <button
+              className="text-button danger-button"
+              type="button"
+              data-transaction-id={transaction.id}
+              onClick={removeTransaction}
+            >
+              Trinti
+            </button>
+          </div>
+        </td>
       </tr>
     )
   }
@@ -323,6 +448,19 @@ function App() {
     )
   }
 
+  const summary = calculateSummary(transactions)
+  const visibleTransactions = transactions.filter(
+    function filterTransaction(transaction) {
+      const matchesType = typeFilter === 'all' ||
+        transaction.type === typeFilter
+      const normalizedCategory = transaction.category.toLowerCase()
+      const normalizedFilter = categoryFilter.toLowerCase()
+      const matchesCategory = normalizedCategory.includes(normalizedFilter)
+
+      return matchesType && matchesCategory
+    },
+  )
+
   return (
     <main>
       <header>
@@ -347,8 +485,41 @@ function App() {
         <p className="notice error">{error}</p>
       )}
 
-      <section>
-        <h2>Nauja operacija</h2>
+      <div className="summary-grid">
+        <article className="summary-card income-card">
+          <span>Pajamos</span>
+          <strong>{formatMoney(summary.income)}</strong>
+        </article>
+        <article className="summary-card expense-card">
+          <span>Išlaidos</span>
+          <strong>{formatMoney(summary.expense)}</strong>
+        </article>
+        <article className="summary-card balance-card">
+          <span>Balansas</span>
+          <strong>{formatMoney(summary.balance)}</strong>
+        </article>
+      </div>
+
+      <section className="panel">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">Kasdienės operacijos</p>
+            <h2>
+              {editingTransactionId
+                ? 'Redaguoti operaciją'
+                : 'Nauja operacija'}
+            </h2>
+          </div>
+          {editingTransactionId && (
+            <button
+              className="secondary-button"
+              type="button"
+              onClick={cancelEditingTransaction}
+            >
+              Atšaukti redagavimą
+            </button>
+          )}
+        </div>
 
         <form onSubmit={submitTransaction}>
           <label>
@@ -407,12 +578,12 @@ function App() {
           </label>
 
           <button type="submit" disabled={!clientId}>
-            Pridėti operaciją
+            {editingTransactionId ? 'Išsaugoti' : 'Pridėti operaciją'}
           </button>
         </form>
       </section>
 
-      <section>
+      <section className="panel">
         <h2>Nauja periodinė taisyklė</h2>
 
         <form onSubmit={submitRecurringRule}>
@@ -500,7 +671,7 @@ function App() {
         </form>
       </section>
 
-      <section>
+      <section className="panel">
         <div className="section-heading">
           <div>
             <h2>Periodinės taisyklės</h2>
@@ -528,8 +699,33 @@ function App() {
         {renderRules()}
       </section>
 
-      <section>
-        <h2>Operacijos</h2>
+      <section className="panel">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">Istorija</p>
+            <h2>Operacijos</h2>
+            <p>
+              Rodoma {visibleTransactions.length} iš {transactions.length}
+            </p>
+          </div>
+          <div className="filters">
+            <select
+              aria-label="Filtruoti pagal tipą"
+              value={typeFilter}
+              onChange={changeTypeFilter}
+            >
+              <option value="all">Visi tipai</option>
+              <option value="income">Pajamos</option>
+              <option value="expense">Išlaidos</option>
+            </select>
+            <input
+              aria-label="Filtruoti pagal kategoriją"
+              placeholder="Ieškoti kategorijos"
+              value={categoryFilter}
+              onChange={changeCategoryFilter}
+            />
+          </div>
+        </div>
 
         <div className="table-wrap">
           <table>
@@ -540,11 +736,12 @@ function App() {
                 <th>Kategorija</th>
                 <th>Aprašymas</th>
                 <th>Suma</th>
+                <th>Veiksmai</th>
               </tr>
             </thead>
 
             <tbody>
-              {transactions.map(renderTransactionRow)}
+              {visibleTransactions.map(renderTransactionRow)}
             </tbody>
           </table>
         </div>
