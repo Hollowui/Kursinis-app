@@ -92,7 +92,7 @@ Visa automatinė patikra (backend testai, frontend lint ir production build):
 
 `npm run check`
 
-Testų rinkinys tikrina įprastą generavimą, 31 dienos perkėlimą į paskutinę trumpesnio mėnesio dieną, taisyklės pabaigos ribą, netinkamą įvestį, dublikatų prevenciją, API scenarijų ir klientų duomenų izoliavimą.
+Testų rinkinys tikrina įprastą generavimą, 31 dienos perkėlimą į paskutinę trumpesnio mėnesio dieną, taisyklės pabaigos ribą, netinkamą įvestį, dublikatų prevenciją, masinį trynimą, API scenarijų ir klientų duomenų izoliavimą.
 
 ## API santrauka
 
@@ -101,8 +101,11 @@ Testų rinkinys tikrina įprastą generavimą, 31 dienos perkėlimą į paskutin
 - `POST /api/transactions` - rankinė operacija.
 - `PATCH /api/transactions/:transactionId` - aktyvaus kliento operacijos pakeitimas.
 - `DELETE /api/transactions/:transactionId` - aktyvaus kliento operacijos ištrynimas.
+- `DELETE /api/transactions/bulk` - kelių pažymėtų aktyvaus kliento operacijų ištrynimas.
 - `GET /api/recurring-rules` - aktyvaus kliento taisyklės.
 - `POST /api/recurring-rules` - nauja taisyklė.
 - `POST /api/recurring-rules/generate` - atėjusių operacijų generavimas iki `throughDate`.
+- `DELETE /api/recurring-rules/:ruleId/transactions` - visų pasirinktos taisyklės sugeneruotų operacijų ištrynimas.
+- `DELETE /api/recurring-rules/:ruleId` - pasirinktos periodinės taisyklės ištrynimas.
 
 Visiems endpoint'ams, išskyrus `/api/clients` ir `/api/health`, būtina `x-client-id` antraštė.

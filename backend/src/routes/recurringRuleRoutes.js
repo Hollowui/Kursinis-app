@@ -2,6 +2,8 @@ import express from 'express'
 import { requireClientContext } from '../middleware/clientContext.js'
 import {
     createRecurringRule,
+    deleteRecurringRule,
+    deleteRecurringRuleTransactions,
     generateDueTransactions,
     listRecurringRules,
 } from '../services/recurringRuleService.js'
@@ -50,3 +52,39 @@ recurringRuleRouter.post('/generate', async function generateRules(request, resp
         throw error
     }
 })
+
+recurringRuleRouter.delete(
+    '/:ruleId/transactions',
+    async function removeRuleTransactions(request, response) {
+        const deletedCount = await deleteRecurringRuleTransactions(
+            request.clientId,
+            request.params.ruleId,
+        )
+
+        if (deletedCount === null) {
+            return response.status(404).json({
+                error: 'Periodinė taisyklė nerasta',
+            })
+        }
+
+        response.json({ deletedCount: deletedCount })
+    },
+)
+
+recurringRuleRouter.delete(
+    '/:ruleId',
+    async function removeRule(request, response) {
+        const deleted = await deleteRecurringRule(
+            request.clientId,
+            request.params.ruleId,
+        )
+
+        if (!deleted) {
+            return response.status(404).json({
+                error: 'Periodinė taisyklė nerasta',
+            })
+        }
+
+        response.status(204).send()
+    },
+)

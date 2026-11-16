@@ -3,6 +3,7 @@ import { requireClientContext } from '../middleware/clientContext.js'
 import {
     createTransaction,
     deleteTransaction,
+    deleteTransactions,
     listTransactions,
     updateTransaction,
     ValidationError,
@@ -67,6 +68,29 @@ transactionRouter.patch(
         }
     },
 )
+
+transactionRouter.delete(
+    '/bulk',
+    async function removeTransactions(request, response) {
+        try {
+            const deletedCount = await deleteTransactions(
+                request.clientId,
+                request.body.transactionIds,
+            )
+
+            response.json({ deletedCount: deletedCount })
+        } catch (error) {
+            if (error instanceof ValidationError) {
+                return response.status(400).json({
+                    error: error.message,
+                })
+            }
+
+            throw error
+        }
+    },
+)
+
 transactionRouter.delete(
     '/:transactionId',
     async function removeTransaction(request, response) {

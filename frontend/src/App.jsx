@@ -80,6 +80,7 @@ function App() {
   const [editingTransactionId, setEditingTransactionId] = useState('')
   const [typeFilter, setTypeFilter] = useState('all')
   const [categoryFilter, setCategoryFilter] = useState('')
+  const [selectedTransactionIds, setSelectedTransactionIds] = useState([])
 
   useEffect(function loadClients() {
     apiRequest('/api/clients')
@@ -127,6 +128,7 @@ function App() {
     setError('')
     setEditingTransactionId('')
     setTransactionForm(createEmptyTransactionForm())
+    setSelectedTransactionIds([])
   }
 
   function changeRecurringForm(event) {
@@ -279,7 +281,141 @@ function App() {
       })
 
       await reloadClientData()
+      setSelectedTransactionIds(function removeDeletedId(currentIds) {
+        return currentIds.filter(function keepId(currentId) {
+          return currentId !== transactionId
+        })
+      })
       setMessage('Operacija ištrinta.')
+      setError('')
+    } catch (requestError) {
+      setError(requestError.message)
+    }
+  }
+
+  function toggleTransactionSelection(event) {
+    const transactionId = event.currentTarget.dataset.transactionId
+
+    setSelectedTransactionIds(function updateSelection(currentIds) {
+      if (currentIds.includes(transactionId)) {
+        return currentIds.filter(function removeId(currentId) {
+          return currentId !== transactionId
+        })
+      }
+
+      return currentIds.concat(transactionId)
+    })
+  }
+
+  function toggleAllVisibleTransactions() {
+    const visibleIds = visibleTransactions.map(
+      function getTransactionId(transaction) {
+        return transaction.id
+      },
+    )
+    const allVisibleSelected = visibleIds.length > 0 &&
+      visibleIds.every(function checkSelected(transactionId) {
+        return selectedTransactionIds.includes(transactionId)
+      })
+
+    setSelectedTransactionIds(function updateSelection(currentIds) {
+      if (allVisibleSelected) {
+        return currentIds.filter(function keepHiddenId(transactionId) {
+          return !visibleIds.includes(transactionId)
+        })
+      }
+
+      return Array.from(new Set(currentIds.concat(visibleIds)))
+    })
+  }
+
+  async function removeSelectedTransactions() {
+    const selectedCount = selectedTransactionIds.length
+    const confirmed = window.confirm(
+      'Ar tikrai norite ištrinti pažymėtas operacijas: ' +
+      selectedCount + '?',
+    )
+
+    if (!confirmed) {
+      return
+    }
+
+    try {
+      const result = await apiRequest('/api/transactions/bulk', {
+        method: 'DELETE',
+        headers: {
+          'content-type': 'application/json',
+          'x-client-id': clientId,
+        },
+        body: JSON.stringify({
+          transactionIds: selectedTransactionIds,
+        }),
+      })
+
+      await reloadClientData()
+      setSelectedTransactionIds([])
+      setMessage(
+        'Ištrinta operacijų: ' + result.deletedCount + '.',
+      )
+      setError('')
+    } catch (requestError) {
+      setError(requestError.message)
+    }
+  }
+
+  async function removeRuleTransactions(event) {
+    const ruleId = event.currentTarget.dataset.ruleId
+    const confirmed = window.confirm(
+      'Ar tikrai norite ištrinti visas šios taisyklės operacijas?',
+    )
+
+    if (!confirmed) {
+      return
+    }
+
+    try {
+      const result = await apiRequest(
+        '/api/recurring-rules/' + ruleId + '/transactions',
+        {
+          method: 'DELETE',
+          headers: {
+            'x-client-id': clientId,
+          },
+        },
+      )
+
+      await reloadClientData()
+      setSelectedTransactionIds([])
+      setMessage(
+        'Ištrinta taisyklės operacijų: ' + result.deletedCount + '.',
+      )
+      setError('')
+    } catch (requestError) {
+      setError(requestError.message)
+    }
+  }
+
+  async function removeRecurringRule(event) {
+    const ruleId = event.currentTarget.dataset.ruleId
+    const confirmed = window.confirm(
+      'Ar tikrai norite pašalinti šią periodinę taisyklę? ' +
+      'Jau sukurtos operacijos liks istorijoje.',
+    )
+
+    if (!confirmed) {
+      return
+    }
+
+    try {
+      await apiRequest('/api/recurring-rules/' + ruleId, {
+        method: 'DELETE',
+        headers: {
+          'x-client-id': clientId,
+        },
+      })
+
+      await reloadClientData()
+      setMessage('Periodinė taisyklė pašalinta.')
       setError('')
     } catch (requestError) {
       setError(requestError.message)
@@ -370,18 +506,34 @@ function App() {
         <td>{formatMoney(rule.amountCents)}</td>
         <td>{rule.frequency}</td>
         <td>{rule.nextOccurrenceDate}</td>
+        <td>
+          <div className="row-actions">
+            <button
+              className="text-button danger-button"
+              type="button"
+              data-rule-id={rule.id}
+              onClick={removeRuleTransactions}
+            >
+              Trinti operacijas
+            </button>
+            <button
+              className="text-button danger-button"
+              type="button"
+              data-rule-id={rule.id}
+              onClick={removeRecurringRule}
+            >
+              Trinti taisyklę
+            </button>
+          </div>
+        </td>
       </tr>
     )
   }
 
   function renderTransactionRow(transaction) {
-    let transactionDate = transaction.date.slice(0, 10)
+    const transactionDate = transaction.date.slice(0, 10)
     let transactionType = 'Pajamos'
     let description = transaction.description
-
-    if (transaction.occurrenceDate) {
-      transactionDate = transaction.occurrenceDate
-    }
 
     if (transaction.type === 'expense') {
       transactionType = 'Išlaidos'
@@ -393,6 +545,16 @@ function App() {
 
     return (
       <tr key={transaction.id}>
+        <td>
+          <input
+            className="selection-checkbox"
+            type="checkbox"
+            aria-label="Pažymėti operaciją"
+            data-transaction-id={transaction.id}
+            checked={selectedTransactionIds.includes(transaction.id)}
+            onChange={toggleTransactionSelection}
+          />
+        </td>
         <td>{transactionDate}</td>
         <td>{transactionType}</td>
         <td>{transaction.category}</td>
@@ -440,6 +602,7 @@ function App() {
               <th>Suma</th>
               <th>Dažnis</th>
               <th>Kita data</th>
+              <th>Veiksmai</th>
             </tr>
           </thead>
           <tbody>{rules.map(renderRuleRow)}</tbody>
@@ -460,6 +623,10 @@ function App() {
       return matchesType && matchesCategory
     },
   )
+  const allVisibleSelected = visibleTransactions.length > 0 &&
+    visibleTransactions.every(function checkSelected(transaction) {
+      return selectedTransactionIds.includes(transaction.id)
+    })
 
   return (
     <main>
@@ -728,9 +895,33 @@ function App() {
         </div>
 
         <div className="table-wrap">
+          {selectedTransactionIds.length > 0 && (
+            <div className="bulk-actions">
+              <strong>
+                Pažymėta: {selectedTransactionIds.length}
+              </strong>
+              <button
+                className="danger-action-button"
+                type="button"
+                onClick={removeSelectedTransactions}
+              >
+                Ištrinti pažymėtas
+              </button>
+            </div>
+          )}
+
           <table>
             <thead>
               <tr>
+                <th>
+                  <input
+                    className="selection-checkbox"
+                    type="checkbox"
+                    aria-label="Pažymėti visas matomas operacijas"
+                    checked={allVisibleSelected}
+                    onChange={toggleAllVisibleTransactions}
+                  />
+                </th>
                 <th>Data</th>
                 <th>Tipas</th>
                 <th>Kategorija</th>

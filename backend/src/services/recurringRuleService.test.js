@@ -122,4 +122,16 @@ describe('recurringRuleService', function () {
         expect(clientARules.length).toBe(1)
         expect(clientBRules.length).toBe(1)
     })
+
+    test('naujausią taisyklę grąžina pirmą', async function () {
+        await createRecurringRule(CLIENT_A_ID, MONTHLY_RULE)
+        await createRecurringRule(CLIENT_A_ID, {
+            ...MONTHLY_RULE,
+            category: 'Naujausia taisyklė',
+        })
+
+        const rules = await listRecurringRules(CLIENT_A_ID)
+
+        expect(rules[0].category).toBe('Naujausia taisyklė')
+    })
 })

@@ -219,6 +219,39 @@ button:disabled {
   overflow-x: auto;
 }
 
+.bulk-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+  padding: 12px 14px;
+  border: 1px solid #fecdd3;
+  border-radius: 10px;
+  color: #881337;
+  background: #fff1f2;
+}
+
+.danger-action-button {
+  border-color: #be123c;
+  color: #fff;
+  background: #be123c;
+}
+
+.danger-action-button:hover {
+  border-color: #9f1239;
+  background: #9f1239;
+}
+
+.selection-checkbox {
+  width: 18px;
+  height: 18px;
+  min-height: 0;
+  padding: 0;
+  accent-color: #2563eb;
+  cursor: pointer;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;
@@ -303,7 +336,8 @@ tbody tr:hover {
   }
 
   .filters,
-  .generate-controls {
+  .generate-controls,
+  .bulk-actions {
     align-items: stretch;
     flex-direction: column;
   }

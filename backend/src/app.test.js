@@ -114,8 +114,8 @@ describe('klientų duomenų izoliacija', function () {
         )
 
         expect(occurrenceDates).toEqual([
-            '2026-10-31',
             '2026-11-30',
+            '2026-10-31',
         ])
     })
 
@@ -142,5 +142,139 @@ describe('klientų duomenų izoliacija', function () {
 
         expect(clientAResponse.body.transactions.length).toBe(0)
         expect(clientBResponse.body.transactions.length).toBe(1)
+    })
+
+    test('masiškai ištrina tik aktyvaus kliento operacijas', async function () {
+        const deleteResponse = await request(app)
+            .delete('/api/transactions/bulk')
+            .set('x-client-id', CLIENT_A_ID)
+            .send({
+                transactionIds: [
+                    'transaction-a-1',
+                    'transaction-b-1',
+                ],
+            })
+            .expect(200)
+
+        expect(deleteResponse.body.deletedCount).toBe(1)
+
+        const clientAResponse = await request(app)
+            .get('/api/transactions')
+            .set('x-client-id', CLIENT_A_ID)
+            .expect(200)
+
+        const clientBResponse = await request(app)
+            .get('/api/transactions')
+            .set('x-client-id', CLIENT_B_ID)
+            .expect(200)
+
+        expect(clientAResponse.body.transactions.length).toBe(0)
+        expect(clientBResponse.body.transactions.length).toBe(1)
+    })
+
+    test('ištrina visas pasirinktos taisyklės operacijas', async function () {
+        const createResponse = await request(app)
+            .post('/api/recurring-rules')
+            .set('x-client-id', CLIENT_A_ID)
+            .send({
+                type: 'expense',
+                amountCents: 1999,
+                category: 'Prenumeratos',
+                description: 'Muzika',
+                frequency: 'monthly',
+                startDate: '2026-10-31',
+            })
+            .expect(201)
+
+        const ruleId = createResponse.body.recurringRule.id
+
+        await request(app)
+            .post('/api/recurring-rules/generate')
+            .set('x-client-id', CLIENT_A_ID)
+            .send({ throughDate: '2026-11-30' })
+            .expect(200)
+
+        const deleteResponse = await request(app)
+            .delete('/api/recurring-rules/' + ruleId + '/transactions')
+            .set('x-client-id', CLIENT_A_ID)
+            .expect(200)
+
+        expect(deleteResponse.body.deletedCount).toBe(2)
+
+        const transactionsResponse = await request(app)
+            .get('/api/transactions')
+            .set('x-client-id', CLIENT_A_ID)
+            .expect(200)
+
+        const ruleTransactions =
+            transactionsResponse.body.transactions.filter(
+                function findRuleTransaction(transaction) {
+                    return transaction.recurringRuleId === ruleId
+                },
+            )
+
+        expect(ruleTransactions.length).toBe(0)
+
+        const regenerateResponse = await request(app)
+            .post('/api/recurring-rules/generate')
+            .set('x-client-id', CLIENT_A_ID)
+            .send({ throughDate: '2026-11-30' })
+            .expect(200)
+
+        expect(regenerateResponse.body.generatedTransactions.length).toBe(2)
+    })
+
+    test('leidžia ištrinti tik savo periodinę taisyklę', async function () {
+        const clientARuleResponse = await request(app)
+            .post('/api/recurring-rules')
+            .set('x-client-id', CLIENT_A_ID)
+            .send({
+                type: 'expense',
+                amountCents: 1999,
+                category: 'Prenumeratos',
+                frequency: 'monthly',
+                startDate: '2026-11-01',
+            })
+            .expect(201)
+
+        const clientBRuleResponse = await request(app)
+            .post('/api/recurring-rules')
+            .set('x-client-id', CLIENT_B_ID)
+            .send({
+                type: 'income',
+                amountCents: 5000,
+                category: 'Papildomos pajamos',
+                frequency: 'monthly',
+                startDate: '2026-11-01',
+            })
+            .expect(201)
+
+        const clientARuleId =
+            clientARuleResponse.body.recurringRule.id
+        const clientBRuleId =
+            clientBRuleResponse.body.recurringRule.id
+
+        await request(app)
+            .delete('/api/recurring-rules/' + clientBRuleId)
+            .set('x-client-id', CLIENT_A_ID)
+            .expect(404)
+
+        await request(app)
+            .delete('/api/recurring-rules/' + clientARuleId)
+            .set('x-client-id', CLIENT_A_ID)
+            .expect(204)
+
+        const clientARulesResponse = await request(app)
+            .get('/api/recurring-rules')
+            .set('x-client-id', CLIENT_A_ID)
+            .expect(200)
+
+        const clientBRulesResponse = await request(app)
+            .get('/api/recurring-rules')
+            .set('x-client-id', CLIENT_B_ID)
+            .expect(200)
+
+        expect(clientARulesResponse.body.recurringRules.length).toBe(0)
+        expect(clientBRulesResponse.body.recurringRules.length).toBe(1)
     })
 })

@@ -81,9 +81,13 @@ export async function clientExists(clientId) {
 
 export async function findTransactions(clientId) {
     if (!isDatabaseConnected()) {
-        return store.transactions.filter(function findTransaction(transaction) {
-            return transaction.clientId === clientId
-        })
+        return store.transactions
+            .filter(function findTransaction(transaction) {
+                return transaction.clientId === clientId
+            })
+            .sort(function sortNewestFirst(first, second) {
+                return second.date.localeCompare(first.date)
+            })
     }
 
     const transactions = await Transaction.find({ clientId: clientId })
@@ -175,11 +179,105 @@ export async function deleteTransactionRecord(clientId, transactionId) {
     return result.deletedCount === 1
 }
 
+export async function deleteTransactionRecords(clientId, transactionIds) {
+    if (!isDatabaseConnected()) {
+        const selectedIds = new Set(transactionIds)
+        const previousCount = store.transactions.length
+
+        store.transactions = store.transactions.filter(
+            function keepTransaction(transaction) {
+                const belongsToClient = transaction.clientId === clientId
+                const isSelected = selectedIds.has(transaction.id)
+
+                return !belongsToClient || !isSelected
+            },
+        )
+
+        return previousCount - store.transactions.length
+    }
+
+    const validIds = transactionIds.filter(
+        function keepValidId(transactionId) {
+            return mongoose.isValidObjectId(transactionId)
+        },
+    )
+
+    if (validIds.length === 0) {
+        return 0
+    }
+
+    const result = await Transaction.deleteMany({
+        _id: { $in: validIds },
+        clientId: clientId,
+    })
+
+    return result.deletedCount
+}
+
+export async function deleteTransactionsByRule(clientId, ruleId) {
+    if (!isDatabaseConnected()) {
+        const previousCount = store.transactions.length
+
+        store.transactions = store.transactions.filter(
+            function keepTransaction(transaction) {
+                const belongsToRule =
+                    transaction.clientId === clientId &&
+                    transaction.recurringRuleId === ruleId
+
+                return !belongsToRule
+            },
+        )
+
+        return previousCount - store.transactions.length
+    }
+
+    if (!mongoose.isValidObjectId(ruleId)) {
+        return 0
+    }
+
+    const result = await Transaction.deleteMany({
+        clientId: clientId,
+        recurringRuleId: ruleId,
+    })
+
+    return result.deletedCount
+}
+
+export async function deleteRecurringRuleRecord(clientId, ruleId) {
+    if (!isDatabaseConnected()) {
+        const ruleIndex = store.recurringRules.findIndex(
+            function findRule(rule) {
+                return rule.id === ruleId && rule.clientId === clientId
+            },
+        )
+
+        if (ruleIndex === -1) {
+            return false
+        }
+
+        store.recurringRules.splice(ruleIndex, 1)
+        return true
+    }
+
+    if (!mongoose.isValidObjectId(ruleId)) {
+        return false
+    }
+
+    const result = await RecurringRule.deleteOne({
+        _id: ruleId,
+        clientId: clientId,
+    })
+
+    return result.deletedCount === 1
+}
+
 export async function findRecurringRules(clientId) {
     if (!isDatabaseConnected()) {
-        return store.recurringRules.filter(function findRule(rule) {
-            return rule.clientId === clientId
-        })
+        return store.recurringRules
+            .filter(function findRule(rule) {
+                return rule.clientId === clientId
+            })
+            .reverse()
     }
 
     const rules = await RecurringRule.find({ clientId: clientId })

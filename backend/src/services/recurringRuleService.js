@@ -1,7 +1,9 @@
 import { randomUUID } from 'node:crypto'
 import { calculateNextOccurrence } from '../domain/calculateNextOccurrence.js'
 import {
+    deleteRecurringRuleRecord,
     findRecurringRules,
+    deleteTransactionsByRule,
     insertRecurringRule,
     insertTransaction,
     occurrenceExists,
@@ -108,6 +110,36 @@ function validateRule(input) {
 export async function listRecurringRules(clientId) {
     const normalizedClientId = normalizeClientId(clientId)
     return findRecurringRules(normalizedClientId)
+}
+
+export async function deleteRecurringRuleTransactions(clientId, ruleId) {
+    const normalizedClientId = normalizeClientId(clientId)
+    const rules = await findRecurringRules(normalizedClientId)
+    const rule = rules.find(function findRule(rule) {
+        return rule.id === ruleId
+    })
+
+    if (!rule) {
+        return null
+    }
+
+    const deletedCount = await deleteTransactionsByRule(
+        normalizedClientId,
+        ruleId,
+    )
+
+    await updateRuleNextDate(rule.id, rule.startDate)
+
+    return deletedCount
+}
+
+export async function deleteRecurringRule(clientId, ruleId) {
+    const normalizedClientId = normalizeClientId(clientId)
+
+    return deleteRecurringRuleRecord(
+        normalizedClientId,
+        ruleId,
+    )
 }
 
 export async function createRecurringRule(clientId, input) {
