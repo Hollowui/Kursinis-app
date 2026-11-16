@@ -2,6 +2,7 @@ import express from 'express'
 import { requireClientContext } from '../middleware/clientContext.js'
 import {
     createTransaction,
+    deleteTransaction,
     listTransactions,
     updateTransaction,
     ValidationError,
@@ -64,5 +65,22 @@ transactionRouter.patch(
 
             throw error
         }
+    },
+)
+transactionRouter.delete(
+    '/:transactionId',
+    (request, response) => {
+        const deleted = deleteTransaction(
+            request.clientId,
+            request.params.transactionId,
+        )
+
+        if (!deleted) {
+            return response.status(404).json({
+                error: 'Operacija nerasta',
+            })
+        }
+
+        response.status(204).send()
     },
 )

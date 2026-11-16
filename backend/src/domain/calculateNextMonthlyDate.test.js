@@ -1,8 +1,8 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, test } from 'vitest'
 import { calculateNextMonthlyDate } from './calculateNextMonthlyDate.js'
 
-describe('calculateNextMonthlyDate', () => {
-    it('apskaičiuoja kitą įprastą mėnesio datą', () => {
+describe('calculateNextMonthlyDate', function () {
+    test('apskaičiuoja kitą įprastą mėnesio datą', function () {
         const currentDate = new Date(2026, 9, 1)
 
         const result = calculateNextMonthlyDate(currentDate, 1)
@@ -10,7 +10,7 @@ describe('calculateNextMonthlyDate', () => {
         expect(result).toEqual(new Date(2026, 10, 1))
     })
 
-    it('naudoja paskutinę vasario dieną ir kovą grįžta į 31 dieną', () => {
+    test('naudoja paskutinę vasario dieną ir kovą grįžta į 31 dieną', function () {
         const januaryDate = new Date(2027, 0, 31)
 
         const februaryDate = calculateNextMonthlyDate(januaryDate, 31)
@@ -20,10 +20,10 @@ describe('calculateNextMonthlyDate', () => {
         expect(marchDate).toEqual(new Date(2027, 2, 31))
     })
 
-    it('atmeta netinkamą pradinę mėnesio dieną', () => {
+    test('atmeta netinkamą pradinę mėnesio dieną', function () {
         const currentDate = new Date(2026, 9, 1)
 
-        expect(() => {
+        expect(function () {
             calculateNextMonthlyDate(currentDate, 0)
         }).toThrow('Pradinė mėnesio diena turi būti nuo 1 iki 31')
     })

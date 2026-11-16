@@ -102,3 +102,21 @@ export function updateTransaction(
 
     return updatedTransaction
 }
+
+export function deleteTransaction(clientId, transactionId) {
+    const normalizedClientId = normalizeClientId(clientId)
+
+    const transactionIndex = store.transactions.findIndex(
+        (transaction) =>
+            transaction.id === transactionId &&
+            transaction.clientId === normalizedClientId,
+    )
+
+    if (transactionIndex === -1) {
+        return false
+    }
+
+    store.transactions.splice(transactionIndex, 1)
+
+    return true
+}

@@ -1,5 +1,5 @@
 import request from 'supertest'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, test } from 'vitest'
 import { app } from './app.js'
 import {
     CLIENT_A_ID,
@@ -7,12 +7,12 @@ import {
     resetStore,
 } from './data/store.js'
 
-describe('klientų duomenų izoliacija', () => {
-    beforeEach(() => {
+describe('klientų duomenų izoliacija', function () {
+    beforeEach(function () {
         resetStore()
     })
 
-    it('atmeta užklausą be kliento konteksto', async () => {
+    test('atmeta užklausą be kliento konteksto', async function () {
         const response = await request(app)
             .get('/api/transactions')
             .expect(400)
@@ -22,23 +22,19 @@ describe('klientų duomenų izoliacija', () => {
         )
     })
 
-    it('klientui grąžina tik jo operacijas', async () => {
+    test('klientui grąžina tik jo operacijas', async function () {
         const response = await request(app)
             .get('/api/transactions')
             .set('x-client-id', CLIENT_A_ID)
             .expect(200)
 
-        expect(response.body.transactions).toHaveLength(1)
-
-        expect(
-            response.body.transactions.every(
-                (transaction) =>
-                    transaction.clientId === CLIENT_A_ID,
-            ),
-        ).toBe(true)
+        expect(response.body.transactions.length).toBe(1)
+        expect(response.body.transactions[0].clientId).toBe(
+            CLIENT_A_ID,
+        )
     })
 
-    it('neleidžia klientui pakeisti kito kliento operacijos', async () => {
+    test('neleidžia klientui pakeisti kito kliento operacijos', async function () {
         await request(app)
             .patch('/api/transactions/transaction-b-1')
             .set('x-client-id', CLIENT_A_ID)
@@ -57,7 +53,7 @@ describe('klientų duomenų izoliacija', () => {
         ).toBe(2500)
     })
 
-    it('kliento ID ima iš antraštės, o ne užklausos body', async () => {
+    test('kliento ID ima iš antraštės, o ne užklausos body', async function () {
         const response = await request(app)
             .post('/api/transactions')
             .set('x-client-id', CLIENT_A_ID)
@@ -76,7 +72,7 @@ describe('klientų duomenų izoliacija', () => {
         )
     })
 
-    it('įvykdo periodinės operacijos scenarijų per API', async () => {
+    test('įvykdo periodinės operacijos scenarijų per API', async function () {
         const createResponse = await request(app)
             .post('/api/recurring-rules')
             .set('x-client-id', CLIENT_A_ID)
@@ -103,13 +99,48 @@ describe('klientų duomenų izoliacija', () => {
 
         expect(createResponse.body.recurringRule.nextOccurrenceDate)
             .toBe('2026-10-31')
-        expect(
-            transactionsResponse.body.transactions
-                .filter((transaction) =>
-                    transaction.recurringRuleId ===
-                    createResponse.body.recurringRule.id,
-                )
-                .map((transaction) => transaction.occurrenceDate),
-        ).toEqual(['2026-10-31', '2026-11-30'])
+        const recurringTransactions =
+            transactionsResponse.body.transactions.filter(
+                function (transaction) {
+                    return transaction.recurringRuleId ===
+                        createResponse.body.recurringRule.id
+                },
+            )
+
+        const occurrenceDates = recurringTransactions.map(
+            function (transaction) {
+                return transaction.occurrenceDate
+            },
+        )
+
+        expect(occurrenceDates).toEqual([
+            '2026-10-31',
+            '2026-11-30',
+        ])
+    })
+
+    test('leidžia ištrinti tik savo kliento operaciją', async function () {
+        await request(app)
+            .delete('/api/transactions/transaction-b-1')
+            .set('x-client-id', CLIENT_A_ID)
+            .expect(404)
+
+        await request(app)
+            .delete('/api/transactions/transaction-a-1')
+            .set('x-client-id', CLIENT_A_ID)
+            .expect(204)
+
+        const clientAResponse = await request(app)
+            .get('/api/transactions')
+            .set('x-client-id', CLIENT_A_ID)
+            .expect(200)
+
+        const clientBResponse = await request(app)
+            .get('/api/transactions')
+            .set('x-client-id', CLIENT_B_ID)
+            .expect(200)
+
+        expect(clientAResponse.body.transactions.length).toBe(0)
+        expect(clientBResponse.body.transactions.length).toBe(1)
     })
 })

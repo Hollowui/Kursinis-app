@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, test } from 'vitest'
 import {
     CLIENT_A_ID,
     CLIENT_B_ID,
@@ -20,12 +20,12 @@ const MONTHLY_RULE = {
     startDate: '2027-01-31',
 }
 
-describe('recurringRuleService', () => {
-    beforeEach(() => {
+describe('recurringRuleService', function () {
+    beforeEach(function () {
         resetStore()
     })
 
-    it('sukuria taisyklę ir sugeneruoja atėjusias operacijas', () => {
+    test('sukuria taisyklę ir sugeneruoja atėjusias operacijas', function () {
         const rule = createRecurringRule(CLIENT_A_ID, MONTHLY_RULE)
 
         const result = generateDueTransactions(
@@ -33,13 +33,21 @@ describe('recurringRuleService', () => {
             '2027-03-31',
         )
 
-        expect(result.generatedTransactions.map(
-            (transaction) => transaction.occurrenceDate,
-        )).toEqual(['2027-01-31', '2027-02-28', '2027-03-31'])
+        const occurrenceDates = result.generatedTransactions.map(
+            function (transaction) {
+                return transaction.occurrenceDate
+            },
+        )
+
+        expect(occurrenceDates).toEqual([
+            '2027-01-31',
+            '2027-02-28',
+            '2027-03-31',
+        ])
         expect(rule.nextOccurrenceDate).toBe('2027-04-30')
     })
 
-    it('pakartotinai negeneruoja tos pačios taisyklės ir datos', () => {
+    test('pakartotinai negeneruoja tos pačios taisyklės ir datos', function () {
         const rule = createRecurringRule(CLIENT_A_ID, MONTHLY_RULE)
 
         generateDueTransactions(CLIENT_A_ID, '2027-01-31')
@@ -50,51 +58,66 @@ describe('recurringRuleService', () => {
             '2027-01-31',
         )
 
-        expect(result.generatedTransactions).toHaveLength(0)
+        expect(result.generatedTransactions.length).toBe(0)
         expect(result.skippedDuplicates).toBe(1)
-        expect(
-            store.transactions.filter(
-                (transaction) => transaction.recurringRuleId === rule.id,
-            ),
-        ).toHaveLength(1)
+
+        const ruleTransactions = store.transactions.filter(
+            function (transaction) {
+                return transaction.recurringRuleId === rule.id
+            },
+        )
+
+        expect(ruleTransactions.length).toBe(1)
     })
 
-    it('atmeta netinkamą taisyklę', () => {
-        expect(() => createRecurringRule(CLIENT_A_ID, {
+    test('atmeta netinkamą taisyklę', function () {
+        const invalidRule = {
             ...MONTHLY_RULE,
             amountCents: 0,
-        })).toThrow('Suma turi būti teigiamas sveikas centų skaičius')
+        }
+
+        expect(function () {
+            createRecurringRule(CLIENT_A_ID, invalidRule)
+        }).toThrow('Suma turi būti teigiamas sveikas centų skaičius')
     })
 
-    it('nekuria operacijų po taisyklės pabaigos datos', () => {
-        createRecurringRule(CLIENT_A_ID, {
+    test('nekuria operacijų po taisyklės pabaigos datos', function () {
+        const ruleWithEndDate = {
             ...MONTHLY_RULE,
             endDate: '2027-02-28',
-        })
+        }
+
+        createRecurringRule(CLIENT_A_ID, ruleWithEndDate)
 
         const result = generateDueTransactions(
             CLIENT_A_ID,
             '2027-03-31',
         )
 
-        expect(result.generatedTransactions).toHaveLength(2)
+        expect(result.generatedTransactions.length).toBe(2)
     })
 
-    it('izoliuoja skirtingų klientų taisykles ir generavimą', () => {
+    test('izoliuoja skirtingų klientų taisykles ir generavimą', function () {
         createRecurringRule(CLIENT_A_ID, MONTHLY_RULE)
-        createRecurringRule(CLIENT_B_ID, {
+
+        const clientBRule = {
             ...MONTHLY_RULE,
             category: 'Transportas',
-        })
+        }
+
+        createRecurringRule(CLIENT_B_ID, clientBRule)
 
         const result = generateDueTransactions(
             CLIENT_A_ID,
             '2027-01-31',
         )
 
-        expect(result.generatedTransactions).toHaveLength(1)
+        const clientARules = listRecurringRules(CLIENT_A_ID)
+        const clientBRules = listRecurringRules(CLIENT_B_ID)
+
+        expect(result.generatedTransactions.length).toBe(1)
         expect(result.generatedTransactions[0].clientId).toBe(CLIENT_A_ID)
-        expect(listRecurringRules(CLIENT_A_ID)).toHaveLength(1)
-        expect(listRecurringRules(CLIENT_B_ID)).toHaveLength(1)
+        expect(clientARules.length).toBe(1)
+        expect(clientBRules.length).toBe(1)
     })
 })
